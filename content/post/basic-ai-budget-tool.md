@@ -1,6 +1,6 @@
 +++
 date = '2025-06-10T08:54:35+08:00'
-draft = true
+draft = false
 title = '0基础开发AI语音记账工具（基于微信 + 云函数 + 飞书）'
 tags = ["AI记账", "微信公众号", "腾讯云函数", "飞书", "Moonshot"]
 categories = ["AI开发"]
