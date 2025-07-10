@@ -37,9 +37,9 @@ params:
     favicon: # e.g.: favicon placed in `static/favicon.ico` of your site folder, then set this field to `/favicon.ico` (`/` is necessary)
     
     # LeanCloud configuration for reading count
-    lean_app_id: ${LEAN_APP_ID}
-    lean_app_key: ${LEAN_APP_KEY}
-    lean_server_url: ${LEAN_SERVER_URL}
+    lean_app_id: 
+    lean_app_key: 
+    lean_server_url: 
 
     footer:
         since: 2025
