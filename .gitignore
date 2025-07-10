@@ -1,6 +1,5 @@
 # Hugo build output
-public/
-resources/_gen/
+
 
 # OS generated files
 .DS_Store

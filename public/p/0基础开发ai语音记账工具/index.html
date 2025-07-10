@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content=" title: &ldquo;AI语音记账系统开发文档（基于微信 + 云函数 + 飞书）&rdquo; date: 2025-06-10 tags: [&ldquo;AI记账&rdquo;, &ldquo;微信公众号&rdquo;, &ldquo;腾讯云函数&rdquo;, &ldquo;飞书&rdquo;, &ldquo;ChatGPT&rdquo;] categories: [&ldquo;开发文档&rdquo;]\r1. 系统目标\r用户通过微信公众号发送语音或文本进行记账。 使用大语言模型解析语义，提取类型、金额、分类、日期等字段。 结构化数据保存至飞书多维表格，便于查询和管理。 2. 技术选型\r前端入口：微信公众号（支持语音和文本消息） 后端处理：腾讯云函数（Node.js 环境） AI 模型：Moonshot API / ChatGPT API（也可集成 ChatGLM、通义千问等国产大模型） 数据库：飞书多维表格（Bitable） 3. 开发环境配置\r安装 Node.js 开发环境（Windows）\r1 scoop install nodejs-lts vscode git 初始化项目并安装依赖\r1 2 npm init -y npm install axios chrono-node dayjs dotenv xml2js 配置环境变量 .env\r1 2 3 4 5 6 7 TOKEN=your_wechat_token MOONSHOT_API_KEY=sk-xxx FEISHU_APP_ID=cli_xxx FEISHU_APP_SECRET=xxx FEISHU_BASE_TOKEN=xxx FEISHU_APP_TOKEN=xxx TABLE_ID=tblxxx 4. 微信公众号对接流程\r微信公众平台中配置服务器 URL，需为 HTTPS，推荐使用自定义域名，如 https://wx.example.com/wx 在腾讯云函数控制台创建新函数，上传打包好的 zip 文件（不包含 node_modules） 核心校验代码示例： 1 2 3 4 5 6 7 8 9 10 11 12 const crypto = require(&#34;crypto&#34;); exports.verifySignature = (event) =&gt; { const { signature, timestamp, nonce, echostr } = event.queryStringParameters; const arr = [process.env.TOKEN, timestamp, nonce].sort(); const str = arr.join(&#39;&#39;); const sha1 = crypto.createHash(&#39;sha1&#39;).update(str).digest(&#39;hex&#39;); return { statusCode: 200, body: sha1 === signature ? echostr : &#39;Invalid signature&#39; }; }; 5. 云函数部署建议\r上传函数 ZIP 包时应排除 node_modules 目录（在云端自动安装） 使用在线编辑器可快速调试逻辑 日志查看入口：云函数控制台 &gt; 调试日志 若需要外部回调，可开启 POST 跨域支持，确保公网可访问 6. AI 模型处理逻辑：解析日期\r推荐使用 chrono-node 自动识别语义中的日期信息：\n">
+<title>0基础开发AI语音记账工具</title>
+
+<link rel='canonical' href='http://localhost:1313/p/0%E5%9F%BA%E7%A1%80%E5%BC%80%E5%8F%91ai%E8%AF%AD%E9%9F%B3%E8%AE%B0%E8%B4%A6%E5%B7%A5%E5%85%B7/'>
+
+<link rel="stylesheet" href="/scss/style.min.cfa5b1b0e78d61c00a14173992a1f3fa3b5c1b9fa34d023de959af564e7b19dd.css"><meta property='og:title' content="0基础开发AI语音记账工具">
+<meta property='og:description' content=" title: &ldquo;AI语音记账系统开发文档（基于微信 + 云函数 + 飞书）&rdquo; date: 2025-06-10 tags: [&ldquo;AI记账&rdquo;, &ldquo;微信公众号&rdquo;, &ldquo;腾讯云函数&rdquo;, &ldquo;飞书&rdquo;, &ldquo;ChatGPT&rdquo;] categories: [&ldquo;开发文档&rdquo;]\r1. 系统目标\r用户通过微信公众号发送语音或文本进行记账。 使用大语言模型解析语义，提取类型、金额、分类、日期等字段。 结构化数据保存至飞书多维表格，便于查询和管理。 2. 技术选型\r前端入口：微信公众号（支持语音和文本消息） 后端处理：腾讯云函数（Node.js 环境） AI 模型：Moonshot API / ChatGPT API（也可集成 ChatGLM、通义千问等国产大模型） 数据库：飞书多维表格（Bitable） 3. 开发环境配置\r安装 Node.js 开发环境（Windows）\r1 scoop install nodejs-lts vscode git 初始化项目并安装依赖\r1 2 npm init -y npm install axios chrono-node dayjs dotenv xml2js 配置环境变量 .env\r1 2 3 4 5 6 7 TOKEN=your_wechat_token MOONSHOT_API_KEY=sk-xxx FEISHU_APP_ID=cli_xxx FEISHU_APP_SECRET=xxx FEISHU_BASE_TOKEN=xxx FEISHU_APP_TOKEN=xxx TABLE_ID=tblxxx 4. 微信公众号对接流程\r微信公众平台中配置服务器 URL，需为 HTTPS，推荐使用自定义域名，如 https://wx.example.com/wx 在腾讯云函数控制台创建新函数，上传打包好的 zip 文件（不包含 node_modules） 核心校验代码示例： 1 2 3 4 5 6 7 8 9 10 11 12 const crypto = require(&#34;crypto&#34;); exports.verifySignature = (event) =&gt; { const { signature, timestamp, nonce, echostr } = event.queryStringParameters; const arr = [process.env.TOKEN, timestamp, nonce].sort(); const str = arr.join(&#39;&#39;); const sha1 = crypto.createHash(&#39;sha1&#39;).update(str).digest(&#39;hex&#39;); return { statusCode: 200, body: sha1 === signature ? echostr : &#39;Invalid signature&#39; }; }; 5. 云函数部署建议\r上传函数 ZIP 包时应排除 node_modules 目录（在云端自动安装） 使用在线编辑器可快速调试逻辑 日志查看入口：云函数控制台 &gt; 调试日志 若需要外部回调，可开启 POST 跨域支持，确保公网可访问 6. AI 模型处理逻辑：解析日期\r推荐使用 chrono-node 自动识别语义中的日期信息：\n">
+<meta property='og:url' content='http://localhost:1313/p/0%E5%9F%BA%E7%A1%80%E5%BC%80%E5%8F%91ai%E8%AF%AD%E9%9F%B3%E8%AE%B0%E8%B4%A6%E5%B7%A5%E5%85%B7/'>
+<meta property='og:site_name' content='叶师傅的博客'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:published_time' content='2025-06-10T08:54:35&#43;08:00'/><meta property='article:modified_time' content='2025-06-10T08:54:35&#43;08:00'/>
+<meta name="twitter:title" content="0基础开发AI语音记账工具">
+<meta name="twitter:description" content=" title: &ldquo;AI语音记账系统开发文档（基于微信 + 云函数 + 飞书）&rdquo; date: 2025-06-10 tags: [&ldquo;AI记账&rdquo;, &ldquo;微信公众号&rdquo;, &ldquo;腾讯云函数&rdquo;, &ldquo;飞书&rdquo;, &ldquo;ChatGPT&rdquo;] categories: [&ldquo;开发文档&rdquo;]\r1. 系统目标\r用户通过微信公众号发送语音或文本进行记账。 使用大语言模型解析语义，提取类型、金额、分类、日期等字段。 结构化数据保存至飞书多维表格，便于查询和管理。 2. 技术选型\r前端入口：微信公众号（支持语音和文本消息） 后端处理：腾讯云函数（Node.js 环境） AI 模型：Moonshot API / ChatGPT API（也可集成 ChatGLM、通义千问等国产大模型） 数据库：飞书多维表格（Bitable） 3. 开发环境配置\r安装 Node.js 开发环境（Windows）\r1 scoop install nodejs-lts vscode git 初始化项目并安装依赖\r1 2 npm init -y npm install axios chrono-node dayjs dotenv xml2js 配置环境变量 .env\r1 2 3 4 5 6 7 TOKEN=your_wechat_token MOONSHOT_API_KEY=sk-xxx FEISHU_APP_ID=cli_xxx FEISHU_APP_SECRET=xxx FEISHU_BASE_TOKEN=xxx FEISHU_APP_TOKEN=xxx TABLE_ID=tblxxx 4. 微信公众号对接流程\r微信公众平台中配置服务器 URL，需为 HTTPS，推荐使用自定义域名，如 https://wx.example.com/wx 在腾讯云函数控制台创建新函数，上传打包好的 zip 文件（不包含 node_modules） 核心校验代码示例： 1 2 3 4 5 6 7 8 9 10 11 12 const crypto = require(&#34;crypto&#34;); exports.verifySignature = (event) =&gt; { const { signature, timestamp, nonce, echostr } = event.queryStringParameters; const arr = [process.env.TOKEN, timestamp, nonce].sort(); const str = arr.join(&#39;&#39;); const sha1 = crypto.createHash(&#39;sha1&#39;).update(str).digest(&#39;hex&#39;); return { statusCode: 200, body: sha1 === signature ? echostr : &#39;Invalid signature&#39; }; }; 5. 云函数部署建议\r上传函数 ZIP 包时应排除 node_modules 目录（在云端自动安装） 使用在线编辑器可快速调试逻辑 日志查看入口：云函数控制台 &gt; 调试日志 若需要外部回调，可开启 POST 跨域支持，确保公网可访问 6. AI 模型处理逻辑：解析日期\r推荐使用 chrono-node 自动识别语义中的日期信息：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">叶师傅的博客</a></h1>
+            <h2 class="site-description">软件开发工程师</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/zmendax/my-blog'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#categories-开发文档">title: &ldquo;AI语音记账系统开发文档（基于微信 + 云函数 + 飞书）&rdquo;
+date: 2025-06-10
+tags: [&ldquo;AI记账&rdquo;, &ldquo;微信公众号&rdquo;, &ldquo;腾讯云函数&rdquo;, &ldquo;飞书&rdquo;, &ldquo;ChatGPT&rdquo;]
+categories: [&ldquo;开发文档&rdquo;]</a></li>
+    <li><a href="#1-系统目标">1. 系统目标</a></li>
+    <li><a href="#2-技术选型">2. 技术选型</a></li>
+    <li><a href="#3-开发环境配置">3. 开发环境配置</a>
+      <ol>
+        <li><a href="#安装-nodejs-开发环境windows">安装 Node.js 开发环境（Windows）</a></li>
+        <li><a href="#初始化项目并安装依赖">初始化项目并安装依赖</a></li>
+        <li><a href="#配置环境变量-env">配置环境变量 <code>.env</code></a></li>
+      </ol>
+    </li>
+    <li><a href="#4-微信公众号对接流程">4. 微信公众号对接流程</a></li>
+    <li><a href="#5-云函数部署建议">5. 云函数部署建议</a></li>
+    <li><a href="#6-ai-模型处理逻辑解析日期">6. AI 模型处理逻辑：解析日期</a></li>
+    <li><a href="#7-飞书表格对接">7. 飞书表格对接</a>
+      <ol>
+        <li><a href="#获取字段结构">获取字段结构</a></li>
+        <li><a href="#添加记录数据格式">添加记录数据格式</a></li>
+        <li><a href="#常见错误提示">常见错误提示</a></li>
+      </ol>
+    </li>
+    <li><a href="#8-实用建议与扩展思路">8. 实用建议与扩展思路</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/p/0%E5%9F%BA%E7%A1%80%E5%BC%80%E5%8F%91ai%E8%AF%AD%E9%9F%B3%E8%AE%B0%E8%B4%A6%E5%B7%A5%E5%85%B7/">0基础开发AI语音记账工具</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2025年6月10日</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 2 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <hr>
+<h2 id="categories-开发文档">title: &ldquo;AI语音记账系统开发文档（基于微信 + 云函数 + 飞书）&rdquo;
+date: 2025-06-10
+tags: [&ldquo;AI记账&rdquo;, &ldquo;微信公众号&rdquo;, &ldquo;腾讯云函数&rdquo;, &ldquo;飞书&rdquo;, &ldquo;ChatGPT&rdquo;]
+categories: [&ldquo;开发文档&rdquo;]
+</h2><h2 id="1-系统目标">1. 系统目标
+</h2><ul>
+<li>用户通过微信公众号发送语音或文本进行记账。</li>
+<li>使用大语言模型解析语义，提取类型、金额、分类、日期等字段。</li>
+<li>结构化数据保存至飞书多维表格，便于查询和管理。</li>
+</ul>
+<h2 id="2-技术选型">2. 技术选型
+</h2><ul>
+<li><strong>前端入口</strong>：微信公众号（支持语音和文本消息）</li>
+<li><strong>后端处理</strong>：腾讯云函数（Node.js 环境）</li>
+<li><strong>AI 模型</strong>：Moonshot API / ChatGPT API（也可集成 ChatGLM、通义千问等国产大模型）</li>
+<li><strong>数据库</strong>：飞书多维表格（Bitable）</li>
+</ul>
+<h2 id="3-开发环境配置">3. 开发环境配置
+</h2><h3 id="安装-nodejs-开发环境windows">安装 Node.js 开发环境（Windows）
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">scoop install nodejs-lts vscode git
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h3 id="初始化项目并安装依赖">初始化项目并安装依赖
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">npm init -y
+</span></span><span class="line"><span class="cl">npm install axios chrono-node dayjs dotenv xml2js
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h3 id="配置环境变量-env">配置环境变量 <code>.env</code>
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-env" data-lang="env"><span class="line"><span class="cl"><span class="nv">TOKEN</span><span class="o">=</span>your_wechat_token
+</span></span><span class="line"><span class="cl"><span class="nv">MOONSHOT_API_KEY</span><span class="o">=</span>sk-xxx
+</span></span><span class="line"><span class="cl"><span class="nv">FEISHU_APP_ID</span><span class="o">=</span>cli_xxx
+</span></span><span class="line"><span class="cl"><span class="nv">FEISHU_APP_SECRET</span><span class="o">=</span>xxx
+</span></span><span class="line"><span class="cl"><span class="nv">FEISHU_BASE_TOKEN</span><span class="o">=</span>xxx
+</span></span><span class="line"><span class="cl"><span class="nv">FEISHU_APP_TOKEN</span><span class="o">=</span>xxx
+</span></span><span class="line"><span class="cl"><span class="nv">TABLE_ID</span><span class="o">=</span>tblxxx
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="4-微信公众号对接流程">4. 微信公众号对接流程
+</h2><ol>
+<li>微信公众平台中配置服务器 URL，需为 HTTPS，推荐使用自定义域名，如 <code>https://wx.example.com/wx</code></li>
+<li>在腾讯云函数控制台创建新函数，上传打包好的 zip 文件（不包含 <code>node_modules</code>）</li>
+<li>核心校验代码示例：</li>
+</ol>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-js" data-lang="js"><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">crypto</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s2">&#34;crypto&#34;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nx">exports</span><span class="p">.</span><span class="nx">verifySignature</span> <span class="o">=</span> <span class="p">(</span><span class="nx">event</span><span class="p">)</span> <span class="p">=&gt;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="kr">const</span> <span class="p">{</span> <span class="nx">signature</span><span class="p">,</span> <span class="nx">timestamp</span><span class="p">,</span> <span class="nx">nonce</span><span class="p">,</span> <span class="nx">echostr</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">event</span><span class="p">.</span><span class="nx">queryStringParameters</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">  <span class="kr">const</span> <span class="nx">arr</span> <span class="o">=</span> <span class="p">[</span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">TOKEN</span><span class="p">,</span> <span class="nx">timestamp</span><span class="p">,</span> <span class="nx">nonce</span><span class="p">].</span><span class="nx">sort</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl">  <span class="kr">const</span> <span class="nx">str</span> <span class="o">=</span> <span class="nx">arr</span><span class="p">.</span><span class="nx">join</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">  <span class="kr">const</span> <span class="nx">sha1</span> <span class="o">=</span> <span class="nx">crypto</span><span class="p">.</span><span class="nx">createHash</span><span class="p">(</span><span class="s1">&#39;sha1&#39;</span><span class="p">).</span><span class="nx">update</span><span class="p">(</span><span class="nx">str</span><span class="p">).</span><span class="nx">digest</span><span class="p">(</span><span class="s1">&#39;hex&#39;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">statusCode</span><span class="o">:</span> <span class="mi">200</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">body</span><span class="o">:</span> <span class="nx">sha1</span> <span class="o">===</span> <span class="nx">signature</span> <span class="o">?</span> <span class="nx">echostr</span> <span class="o">:</span> <span class="s1">&#39;Invalid signature&#39;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">};</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="5-云函数部署建议">5. 云函数部署建议
+</h2><ul>
+<li>上传函数 ZIP 包时应排除 <code>node_modules</code> 目录（在云端自动安装）</li>
+<li>使用在线编辑器可快速调试逻辑</li>
+<li>日志查看入口：云函数控制台 &gt; 调试日志</li>
+<li>若需要外部回调，可开启 POST 跨域支持，确保公网可访问</li>
+</ul>
+<h2 id="6-ai-模型处理逻辑解析日期">6. AI 模型处理逻辑：解析日期
+</h2><p>推荐使用 <code>chrono-node</code> 自动识别语义中的日期信息：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-js" data-lang="js"><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">chrono</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;chrono-node&#39;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">dayjs</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;dayjs&#39;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">parsedDate</span> <span class="o">=</span> <span class="nx">chrono</span><span class="p">.</span><span class="nx">parseDate</span><span class="p">(</span><span class="nx">text</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">finalDate</span> <span class="o">=</span> <span class="nx">parsedDate</span> 
+</span></span><span class="line"><span class="cl">  <span class="o">?</span> <span class="nx">dayjs</span><span class="p">(</span><span class="nx">parsedDate</span><span class="p">).</span><span class="nx">format</span><span class="p">(</span><span class="s1">&#39;YYYY-MM-DD&#39;</span><span class="p">)</span> 
+</span></span><span class="line"><span class="cl">  <span class="o">:</span> <span class="nx">dayjs</span><span class="p">().</span><span class="nx">format</span><span class="p">(</span><span class="s1">&#39;YYYY-MM-DD&#39;</span><span class="p">);</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>注意事项：</p>
+<ul>
+<li><code>chrono.parseDate()</code> 返回 <code>null</code> 时应兜底处理，避免直接使用 <code>.length</code> 报错</li>
+</ul>
+<h2 id="7-飞书表格对接">7. 飞书表格对接
+</h2><ul>
+<li>多维表格地址示例：<code>https://feishu.cn/base/xxx</code></li>
+<li>需手动获取以下配置项：
+<ul>
+<li><code>FEISHU_APP_TOKEN</code></li>
+<li><code>FEISHU_BASE_TOKEN</code></li>
+<li><code>TABLE_ID</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="获取字段结构">获取字段结构
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="err">GET https://open.feishu.cn/open-apis/bitable/v1/apps/:app_token/tables/:table_id/fields
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><h3 id="添加记录数据格式">添加记录数据格式
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;records&#34;</span><span class="p">:</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">    <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;fields&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;类型&#34;</span><span class="p">:</span> <span class="s2">&#34;支出&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;金额&#34;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;分类&#34;</span><span class="p">:</span> <span class="s2">&#34;餐饮&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;备注&#34;</span><span class="p">:</span> <span class="s2">&#34;吃饭&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;日期&#34;</span><span class="p">:</span> <span class="s2">&#34;2025-05-21&#34;</span>
+</span></span><span class="line"><span class="cl">      <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">]</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h3 id="常见错误提示">常见错误提示
+</h3><ul>
+<li>若页面提示“暂时无法在飞书文档外展示此内容”，可尝试更换账号或请求来源 IP。</li>
+</ul>
+<h2 id="8-实用建议与扩展思路">8. 实用建议与扩展思路
+</h2><ul>
+<li>可使用大模型预处理用户语句，例如将“吃饭10”补全为“今天吃饭10元”，提升日期识别成功率</li>
+<li>模型可替换为支持多语言的 Moonshot v1-8k，或对中文优化的通义千问等</li>
+<li>若用户在海外部署系统，可切换数据库方案至 Airtable，以提高稳定性</li>
+</ul>
+<hr>
+<p>如需使用完整模板 zip 包，请指定包含的内容（例如配置文件、函数入口、AI 接口调用逻辑等），可生成供下载。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2025 叶师傅的博客
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.1e4be3f393fe92e5c52df495da217756889e07e10edc2189702d57ab2f4c5111.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>
