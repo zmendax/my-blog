@@ -244,3 +244,10 @@ markup:
         lineNos: true
         lineNumbersInTable: true
         tabWidth: 4
+
+security:
+  funcs:
+    getenv:
+      - LEAN_APP_ID
+      - LEAN_APP_KEY
+      - LEAN_SERVER_URL
